@@ -1,0 +1,26 @@
+# Direktori virtual environment
+.venv/
+env/
+ENV/
+
+# File dan folder cache Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Direktori build
+build/
+dist/
+*.egg-info/
+
+# File konfigurasi lingkungan
+.env
+
+# File editor atau IDE
+.vscode/
+.idea/
+*.sublime-workspace
+
+# File sistem
+.DS_Store
+Thumbs.db
