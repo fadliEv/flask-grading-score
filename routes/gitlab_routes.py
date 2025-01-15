@@ -10,3 +10,11 @@ gitlab_routes.add_url_rule(
     view_func=GitLabController.repository_check,
     methods=["GET"]
 )
+
+
+# Tambahkan endpoint untuk analisis kode
+gitlab_routes.add_url_rule(
+    "/gitlab/analyze-code",
+    view_func=GitLabController.analyze_code,
+    methods=["GET"]
+)

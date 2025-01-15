@@ -10,9 +10,25 @@ app.register_blueprint(gitlab_routes)
 
 if __name__ == "__main__":
     app.run(host="localhost", port=5000, debug=True)
-# import google.generativeai as gemini
+# import google.generativeai as genai
 
 # # Konfigurasikan API key
-# gemini.configure(api_key="AIzaSyCKnwkTKeaUW6xBy9YcRd2aocl6dm1NrXU")
+# genai.configure(api_key="AIzaSyCKnwkTKeaUW6xBy9YcRd2aocl6dm1NrXU")
 
-# model = genai.GenerativeModel('gemini-pro')
+# # Kirim permintaan ke AI
+# try:
+#     # Inisialisasi model
+#     model = genai.GenerativeModel('gemini-pro')
+
+#     # Menghasilkan konten dengan prompt
+#     response = model.generate_content("Hallo, selamat siang?")
+
+#     # Ekstrak teks dari respons
+#     if response and hasattr(response, 'candidates') and response.candidates:
+#         # Ambil teks dari kandidat pertama
+#         text = response.candidates[0].content.parts[0].text
+#         print(f"AI Response: {text}")
+#     else:
+#         print("No response received.")
+# except Exception as e:
+#     print(f"Error: {e}")
