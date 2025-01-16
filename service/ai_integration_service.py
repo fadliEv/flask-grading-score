@@ -33,7 +33,7 @@ class AIIntegrationService:
                             code_combined += f"\n\nFile: {sub_item['path']}\n{sub_item['content']}"
 
             # Kirim prompt ke Gemini AI
-            model = genai.GenerativeModel('gemini-pro')
+            model = genai.GenerativeModel('gemini-1.5-flash')
             response = model.generate_content(f"Pahami Code Berikut, Jelaskan :\n{code_combined}")
 
             # Ekstrak teks dari respons
@@ -45,3 +45,44 @@ class AIIntegrationService:
                 return {"error": "No response from Gemini AI."}
         except Exception as e:
             return {"error": f"Error: {e}"}
+
+    def grade_code_with_ai(self, branch: str, questions: list):
+        try:
+            # Dapatkan kode dari GitLab
+            repository_tree = self.gitlab_service.get_repository_tree_with_content(branch)
+
+            # Gabungkan semua kode menjadi satu string
+            code_combined = ""
+            for item in repository_tree:
+                if item['type'] == 'blob':  # Jika file, tambahkan isi file
+                    code_combined += f"\n\nFile: {item['path']}\n{item['content']}"
+                elif item['type'] == 'tree':  # Jika folder, tambahkan isi folder
+                    for sub_item in item.get('listFile', []):
+                        if sub_item['type'] == 'blob':
+                            code_combined += f"\n\nFile: {sub_item['path']}\n{sub_item['content']}"
+
+            # Proses setiap soal
+            grading_results = []
+            total_score = 0
+
+            for question in questions:
+                prompt = f"Pahamilah code berikut:\n{code_combined}\n\nSoal: {question}\n\nJelaskan apakah kode ini memenuhi requirement dan kenapa."
+                model = genai.GenerativeModel('gemini-pro')
+                response = model.generate_content(prompt)
+
+                if response and hasattr(response, 'candidates') and response.candidates:
+                    ai_response = response.candidates[0].content.parts[0].text
+                    if "error" in ai_response.lower() or "tidak memenuhi" in ai_response.lower():
+                        grading_results.append({"question": question, "result": "Gagal", "reason": ai_response})
+                        total_score += 0
+                    else:
+                        grading_results.append({"question": question, "result": "Lulus", "reason": ai_response})
+                        total_score += 100
+                else:
+                    grading_results.append({"question": question, "result": "Gagal", "reason": "No response from AI."})
+
+            # Hitung nilai rata-rata
+            final_grade = total_score / len(questions)
+            return {"grade": final_grade, "details": grading_results}
+        except Exception as e:
+            return {"errors": f"Error: {e}"}

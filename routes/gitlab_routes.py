@@ -18,3 +18,10 @@ gitlab_routes.add_url_rule(
     view_func=GitLabController.analyze_code,
     methods=["GET"]
 )
+
+
+gitlab_routes.add_url_rule(
+    "/grading",
+    view_func=GitLabController.grade_project,
+    methods=["POST"]
+)
