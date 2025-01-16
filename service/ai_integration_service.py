@@ -14,8 +14,14 @@ class AIIntegrationService:
             raise ValueError("KEY_AI harus disetel di .env")
         genai.configure(api_key=api_key)
 
+        model_ai = os.getenv("MODEL_AI")
+        if not model_ai:
+            raise ValueError("MODEL_AI harus disetel di .env")        
+
         # Inisialisasi GitLabService
         self.gitlab_service = GitLabService()
+        # setup model 
+        self.model = genai.GenerativeModel(model_ai)
 
     def analyze_code_with_ai(self, branch: str):
         try:
@@ -33,8 +39,8 @@ class AIIntegrationService:
                             code_combined += f"\n\nFile: {sub_item['path']}\n{sub_item['content']}"
 
             # Kirim prompt ke Gemini AI
-            model = genai.GenerativeModel('gemini-1.5-flash')
-            response = model.generate_content(f"Pahami Code Berikut, Jelaskan :\n{code_combined}")
+            
+            response = self.model.generate_content(f"Pahami Code Berikut, Jelaskan :\n{code_combined}")
 
             # Ekstrak teks dari respons
             if response and hasattr(response, 'candidates') and response.candidates:
@@ -66,9 +72,8 @@ class AIIntegrationService:
             total_score = 0
 
             for question in questions:
-                prompt = f"Pahamilah code berikut:\n{code_combined}\n\nSoal: {question}\n\nJelaskan apakah kode ini memenuhi requirement dan kenapa."
-                model = genai.GenerativeModel('gemini-pro')
-                response = model.generate_content(prompt)
+                prompt = f"Pahamilah code berikut:\n{code_combined}\n\nSoal: {question}\n\nJelaskan apakah kode tersebut memenuhi requirement soal dan jika terdapat error program atau tidak sesuai intruksi soal jelaskan alasannya."                
+                response = self.model.generate_content(prompt)
 
                 if response and hasattr(response, 'candidates') and response.candidates:
                     ai_response = response.candidates[0].content.parts[0].text
