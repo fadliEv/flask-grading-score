@@ -25,12 +25,15 @@ class GitLabService:
 
     def get_repository_tree_with_content(self, repository_url: str, branch: str):
         try:
+            print(f"GitLab URL: {self.gitlab_url}")
+            print(f"Private Token: {self.private_token}") 
             namespace = extract_gitlab_namespace(repository_url)
+            print(f"Name Space !!!! :  {namespace}")   
+            print(f"Branch !!!! :  {branch}")   
             project = self.gl.projects.get(namespace)
 
-            items = project.repository_tree(ref=branch)
-            logging.debug(f"Check Items !!!! :  {items}")
-            print(f"Check Items !!!! :  {items}")   
+            items = project.repository_tree(ref=branch)            
+            print(f"Items !!!! :  {items}")   
             result = []
 
             for item in items:

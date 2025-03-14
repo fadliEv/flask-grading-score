@@ -15,6 +15,6 @@ def extract_gitlab_namespace(repository_url: str) -> str:
         raise ValueError("URL bukan dari GitLab Enigmacamp")
 
     # Ambil path tanpa leading slash
-    namespace = parsed_url.path.lstrip("/")
+    namespace = parsed_url.path.lstrip("/")    
     
     return namespace

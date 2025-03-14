@@ -1,37 +1,39 @@
 from flask import Flask
 from routes.gitlab_routes import gitlab_routes
 from routes.customer_routes import customer_routes
+from routes.java_routes import java_routes
 
 app = Flask(__name__)
 
 # Register semua routes
 app.register_blueprint(customer_routes)
 app.register_blueprint(gitlab_routes)
+app.register_blueprint(java_routes)
 
 if __name__ == "__main__":
     app.run(host="localhost", port=5100, debug=True)
 
 
+# import gitlab
 
-# import google.generativeai as genai
+# # Masukkan URL GitLab dan token pribadi
+# # Ganti "your_gitlab_personal_access_token" dengan token pribadi Anda
+# private_token = "tjJ6xfkqVs8cePESzf-Q"
+# gitlab_url = "https://git.enigmacamp.com"  # Base URL GitLab Anda
 
-# # Konfigurasikan API key
-# genai.configure(api_key="AIzaSyCKnwkTKeaUW6xBy9YcRd2aocl6dm1NrXU")
+# # Inisialisasi koneksi ke GitLab
+# gl = gitlab.Gitlab(gitlab_url, private_token=private_token)
 
-# # Kirim permintaan ke AI
-# try:
-#     # Inisialisasi model
-#     model = genai.GenerativeModel('gemini-2.0-flash')
+# # Akses repository
+# # Ganti dengan ID proyek atau namespace proyek GitLab Anda
+# project_namespace = "enigma-camp/oflline-class-lovelace/lovelace-turing-19/muhammad-billy-hasman/be/challenge/crud-nasabah"
+# project = gl.projects.get(project_namespace)
 
-#     # Menghasilkan konten dengan prompt
-#     response = model.generate_content("Hallo, selamat siang?")
+# # Ambil daftar file dan folder di cabang tertentu
+# branch = "master"  # Ganti dengan cabang yang sesuai
+# items = project.repository_tree(ref=branch)
 
-#     # Ekstrak teks dari respons
-#     if response and hasattr(response, 'candidates') and response.candidates:
-#         # Ambil teks dari kandidat pertama
-#         text = response.candidates[0].content.parts[0].text
-#         print(f"AI Response: {text}")
-#     else:
-#         print("No response received.")
-# except Exception as e:
-#     print(f"Error: {e}")
+# # Tampilkan file dan folder
+# print(f"Daftar file dan folder di branch '{branch}':")
+# for item in items:
+#     print(f"{item['type']}: {item['path']}")
