@@ -23,56 +23,47 @@ class GitLabService:
 
         self.gl = gitlab.Gitlab(self.gitlab_url, private_token=self.private_token)
 
-    def get_repository_tree_with_content(self, repository_url: str, branch: str):
+    def get_repository_tree_with_content(self, repository_url: str, branch: str, path: str = ""):
         try:
-            print(f"GitLab URL: {self.gitlab_url}")
-            print(f"Private Token: {self.private_token}") 
             namespace = extract_gitlab_namespace(repository_url)
-            print(f"Name Space !!!! :  {namespace}")   
-            print(f"Branch !!!! :  {branch}")   
             project = self.gl.projects.get(namespace)
 
-            items = project.repository_tree(ref=branch)            
-            print(f"Items !!!! :  {items}")   
+            # 🔹 Ambil daftar file & folder dengan path tertentu
+            items = project.repository_tree(ref=branch, path=path)
             result = []
 
             for item in items:
-                if item['type'] == 'tree':
-                    sub_items = project.repository_tree(path=item['path'], ref=branch)
-                    sub_items_with_content = []
-
-                    for sub_item in sub_items:
-                        if sub_item['type'] == 'blob':
-                            content = self.get_file_content(project, sub_item['path'], branch)
-                            sub_items_with_content.append({
-                                **sub_item,
-                                "content": content
-                            })
-
-                    result.append({
-                        **item,
-                        "listFile": sub_items_with_content
-                    })
-                elif item['type'] == 'blob':
-                    content = self.get_file_content(project, item['path'], branch)
+                if item["type"] == "blob":
+                    # 🔹 Jika file, ambil isi file
+                    content = self.get_file_content(repository_url, item["path"], branch)
                     result.append({
                         **item,
                         "content": content
                     })
+                else:
+                    # 🔹 Jika folder, tambahkan tanpa mengambil ulang
+                    result.append(item)
 
             return {"status": "success", "data": result}
+
         except gitlab.exceptions.GitlabGetError as e:
             return {"status": "error", "error": f"GitLab error: {e.error_message}"}
 
+
     def get_file_content(self, project, file_path: str, branch: str):
         try:
+            # 🔹 Pastikan `project` adalah objek GitLab
+            if not isinstance(project, gitlab.v4.objects.Project):
+                raise ValueError(f"Expected Project object, but got {type(project)}")
+
             file = project.files.get(file_path=file_path, ref=branch)
-            
-            # Decode base64 content dari file GitLab
-            content_bytes = base64.b64decode(file.content)  # Gunakan base64 decoding
-            content_str = content_bytes.decode("utf-8")  # Ubah bytes ke string
+
+            # 🔹 Decode base64 content dari GitLab
+            content_bytes = base64.b64decode(file.content)  
+            content_str = content_bytes.decode("utf-8")  
             
             return content_str
         except gitlab.exceptions.GitlabGetError as e:
             return f"Error fetching file content: {e.error_message}"
+
 

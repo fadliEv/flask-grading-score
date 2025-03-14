@@ -37,8 +37,14 @@ class GitLabController:
 
     @staticmethod
     def analyze_code():
-        branch = request.args.get("branch", default="master", type=str)
-        response = ai_service.analyze_code_with_ai(branch)
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Request body tidak boleh kosong"}), 400
+        repository_url = data.get("repository_url")
+        branch = data.get("branch", "master")
+        if not repository_url:
+            return jsonify({"error": "repository_url harus diberikan"}), 400
+        response = ai_service.analyze_code_with_ai(repository_url,branch)
         return jsonify(response), 200
 
     @staticmethod

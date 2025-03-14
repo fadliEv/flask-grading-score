@@ -2,6 +2,9 @@ import os
 import google.generativeai as genai
 from service.gitlab_service import GitLabService
 from dotenv import load_dotenv
+from utils.utils import extract_gitlab_namespace
+import gitlab
+import base64
 
 class AIIntegrationService:
     def __init__(self):
@@ -23,34 +26,108 @@ class AIIntegrationService:
         # setup model 
         self.model = genai.GenerativeModel(model_ai)
 
-    def analyze_code_with_ai(self, branch: str):
+    def analyze_code_with_ai(self, repository_url: str, branch: str):
         try:
-            # Dapatkan kode dari GitLab
-            repository_tree = self.gitlab_service.get_repository_tree_with_content(branch)
+            # 🔹 Ambil namespace dari URL
+            namespace = extract_gitlab_namespace(repository_url)
+            print(f"DEBUG: Extracted namespace -> {namespace}")  # 🔥 Debugging namespace
 
-            # Gabungkan semua kode menjadi satu string
-            code_combined = ""
-            for item in repository_tree:
-                if item['type'] == 'blob':  # Jika file, tambahkan isi file
-                    code_combined += f"\n\nFile: {item['path']}\n{item['content']}"
-                elif item['type'] == 'tree':  # Jika folder, tambahkan isi folder
-                    for sub_item in item.get('listFile', []):
-                        if sub_item['type'] == 'blob':
-                            code_combined += f"\n\nFile: {sub_item['path']}\n{sub_item['content']}"
+            try:
+                # 🔹 Ambil objek `project` dari GitLab
+                project = self.gitlab_service.gl.projects.get(namespace)
+                
+                if not hasattr(project, "id"):  
+                    raise ValueError(f"Project retrieval issue: {project}")
 
-            # Kirim prompt ke Gemini AI
-            
-            response = self.model.generate_content(f"Pahami Code Berikut, Jelaskan :\n{code_combined}")
+            except gitlab.exceptions.GitlabGetError:
+                # 🔹 Jika gagal, coba cari project berdasarkan nama
+                project_list = self.gitlab_service.gl.projects.list(search=namespace)
+                if not project_list:
+                    return {"error": f"Project {namespace} not found in GitLab."}
+                project = project_list[0]  # Ambil project pertama yang cocok
 
-            # Ekstrak teks dari respons
+            print(f"DEBUG: Project ID -> {project.id}")  
+
+            # 🔹 Ambil daftar file & folder di root repository
+            items = project.repository_tree(ref=branch)
+
+            # 🔹 Cari folder `src`
+            src_folder = next((item for item in items if item["type"] == "tree" and item["path"] == "src"), None)
+
+            if not src_folder:
+                return {"error": "Folder 'src' tidak ditemukan di dalam repository."}
+        
+            src_items = project.repository_tree(path="src", ref=branch)
+
+            # 🔹 Cari folder `com` di dalam `src`
+            com_folder = next((item for item in src_items if item["type"] == "tree" and item["path"] == "src/com"), None)
+
+            if not com_folder:
+                return {"error": "Folder 'com' tidak ditemukan di dalam 'src'."}
+
+            # Masuk ke dalam `src/com`
+            com_items = project.repository_tree(path="src/com", ref=branch)
+
+            # 🔹 Cari folder `enigmacamp` di dalam `src/com`
+            enigmacamp_folder = next((item for item in com_items if item["type"] == "tree" and item["path"].startswith("src/com/enigmacamp")), None)
+
+            if not enigmacamp_folder:
+                return {"error": "Folder 'enigmacamp' tidak ditemukan di dalam 'src/com'."}
+
+            # 🔹 Fungsi Rekursif untuk Mengambil Kode dari Semua File `.java`
+            def extract_code_from_tree(path):
+                """Masuk ke dalam folder dan ambil semua file `.java`"""
+                code_text = ""
+                try:
+                    folder_items = project.repository_tree(path=path, ref=branch)
+
+                    print(f"\nMasuk ke dalam folder: {path}")
+                    for item in folder_items:
+                        print(f"{item['type']}: {item['path']}")
+
+                        # Jika ada subfolder, masuk lagi ke dalamnya (rekursif)
+                        if item["type"] == "tree":
+                            code_text += extract_code_from_tree(item["path"])
+
+                        # Jika file `.java`, ambil isi filenya
+                        elif item["type"] == "blob" and item["path"].endswith(".java"):
+                            try:
+                                file_content = project.files.get(file_path=item["path"], ref=branch)
+
+                                # 🔹 Decode isi file dari Base64
+                                decoded_content = base64.b64decode(file_content.content).decode("utf-8")
+
+                                code_text += f"\n\nFile: {item['path']}\n{decoded_content}\n"
+                            except gitlab.exceptions.GitlabGetError as e:
+                                print(f"⚠️ Error: Tidak dapat membaca file '{item['path']}' ({e.error_message})")
+
+                except gitlab.exceptions.GitlabGetError as e:
+                    print(f"⚠️ Error: {e.error_message}")
+
+                return code_text
+
+            # 🔹 Mulai mengambil semua kode dari `src/com/enigmacamp`
+            code_combined = extract_code_from_tree(enigmacamp_folder["path"])
+
+            # 🔥 Jika tidak ada kode ditemukan
+            if not code_combined.strip():
+                return {"error": "Tidak ada file .java yang ditemukan dalam 'src/com/enigmacamp'."}
+
+            print(f"DEBUG: Code Combined -> {code_combined}")
+
+            # 🔥 Kirim kode ke AI
+            response = self.model.generate_content(f"Pahami Code Java Berikut, dan Jelaskan :\n{code_combined}")
+
             if response and hasattr(response, 'candidates') and response.candidates:
-                # Ambil teks dari kandidat pertama
                 ai_response = response.candidates[0].content.parts[0].text
                 return {"response": ai_response}
             else:
                 return {"error": "No response from Gemini AI."}
+
         except Exception as e:
             return {"error": f"Error: {e}"}
+
+
 
     def grade_code_with_ai(self, branch: str, questions: list):
         try:

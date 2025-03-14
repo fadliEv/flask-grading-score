@@ -10,3 +10,9 @@ java_routes.add_url_rule(
     view_func=JavaController.check_java_repository,
     methods=["POST"]
 )
+
+java_routes.add_url_rule(
+    "/java/analyze-code",
+    view_func=JavaController.analyze_code,
+    methods=["POST"]
+)
