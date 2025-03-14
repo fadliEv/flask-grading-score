@@ -3,6 +3,7 @@ from service.gitlab_service import GitLabService
 from service.ai_integration_service import AIIntegrationService
 from entity.grading_request import GradingRequest
 from entity.grading_response import GradingResponse
+from entity.dto.repository_check_dto import RepositoryCheckRequest, RepositoryCheckResponse
 import logging
 
 gitlab_service = GitLabService()
@@ -13,9 +14,26 @@ logging.basicConfig(level=logging.DEBUG)
 class GitLabController:
     @staticmethod
     def repository_check():
-        branch = request.args.get("branch", default="master", type=str)
-        result = gitlab_service.get_repository_tree_with_content(branch)
-        return jsonify(result), 200
+        try:
+            data = request.get_json()
+            if not data:
+                return jsonify({"error": "Request body tidak boleh kosong"}), 400
+
+            # Validasi request
+            request_data = RepositoryCheckRequest(**data)
+
+            # Ambil repository tree
+            result = gitlab_service.get_repository_tree_with_content(
+                request_data.repository_url, request_data.branch
+            )
+
+            if result.get("status") == "error":
+                return jsonify(RepositoryCheckResponse(status="error", data=[], error=result["error"]).dict()), 400
+
+            return jsonify(RepositoryCheckResponse(status="success", data=result["data"]).dict()), 200
+
+        except Exception as e:
+            return jsonify({"error": f"Error: {str(e)}"}), 500  # Ubah error ke string
 
     @staticmethod
     def analyze_code():

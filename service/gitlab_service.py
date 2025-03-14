@@ -1,40 +1,46 @@
 import gitlab
 import os
 from dotenv import load_dotenv
+from utils.utils import extract_gitlab_namespace
+import base64
+import logging
 
+logging.basicConfig(
+    level=logging.DEBUG,  # Pastikan level debug aktif
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.StreamHandler()  # Kirim log ke console
+    ]
+)
 class GitLabService:
     def __init__(self):
-        # Muat file .env
         load_dotenv()
-        # Ambil variabel dari environment
-        gitlab_url = os.getenv("GITLAB_URL")
-        private_token = os.getenv("PRIVATE_TOKEN")
-        project_namespace = os.getenv("PROJECT_NAMESPACE")
+        self.gitlab_url = os.getenv("GITLAB_URL")
+        self.private_token = os.getenv("PRIVATE_TOKEN")
 
-        # Validasi variabel lingkungan
-        if not gitlab_url or not private_token or not project_namespace:
-            raise ValueError("GITLAB_URL, PRIVATE_TOKEN, dan PROJECT_NAMESPACE harus disetel di .env")
+        if not self.gitlab_url or not self.private_token:
+            raise ValueError("GITLAB_URL dan PRIVATE_TOKEN harus disetel di .env")
 
-        # Inisialisasi koneksi ke GitLab
-        self.gl = gitlab.Gitlab(gitlab_url, private_token=private_token)
-        self.project = self.gl.projects.get(project_namespace)
+        self.gl = gitlab.Gitlab(self.gitlab_url, private_token=self.private_token)
 
-    def get_repository_tree_with_content(self, branch: str):
+    def get_repository_tree_with_content(self, repository_url: str, branch: str):
         try:
-            # Ambil daftar tree di root
-            items = self.project.repository_tree(ref=branch)
+            namespace = extract_gitlab_namespace(repository_url)
+            project = self.gl.projects.get(namespace)
+
+            items = project.repository_tree(ref=branch)
+            logging.debug(f"Check Items !!!! :  {items}")
+            print(f"Check Items !!!! :  {items}")   
             result = []
 
             for item in items:
                 if item['type'] == 'tree':
-                    # Jika item adalah folder (tree), ambil isi folder
-                    sub_items = self.project.repository_tree(path=item['path'], ref=branch)
+                    sub_items = project.repository_tree(path=item['path'], ref=branch)
                     sub_items_with_content = []
 
                     for sub_item in sub_items:
                         if sub_item['type'] == 'blob':
-                            # Ambil isi file
-                            content = self.get_file_content(sub_item['path'], branch)
+                            content = self.get_file_content(project, sub_item['path'], branch)
                             sub_items_with_content.append({
                                 **sub_item,
                                 "content": content
@@ -45,21 +51,25 @@ class GitLabService:
                         "listFile": sub_items_with_content
                     })
                 elif item['type'] == 'blob':
-                    # Jika item adalah file, ambil isi file
-                    content = self.get_file_content(item['path'], branch)
+                    content = self.get_file_content(project, item['path'], branch)
                     result.append({
                         **item,
                         "content": content
                     })
 
-            return result
+            return {"status": "success", "data": result}
         except gitlab.exceptions.GitlabGetError as e:
-            return {"error": f"GitLab error: {e.error_message}"}
+            return {"status": "error", "error": f"GitLab error: {e.error_message}"}
 
-    def get_file_content(self, file_path: str, branch: str):
+    def get_file_content(self, project, file_path: str, branch: str):
         try:
-            file = self.project.files.get(file_path=file_path, ref=branch)
-            # Decode isi file dari base64 dan konversi ke string
-            return file.decode().decode('utf-8')
+            file = project.files.get(file_path=file_path, ref=branch)
+            
+            # Decode base64 content dari file GitLab
+            content_bytes = base64.b64decode(file.content)  # Gunakan base64 decoding
+            content_str = content_bytes.decode("utf-8")  # Ubah bytes ke string
+            
+            return content_str
         except gitlab.exceptions.GitlabGetError as e:
             return f"Error fetching file content: {e.error_message}"
+

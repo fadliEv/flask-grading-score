@@ -9,7 +9,10 @@ app.register_blueprint(customer_routes)
 app.register_blueprint(gitlab_routes)
 
 if __name__ == "__main__":
-    app.run(host="localhost", port=5000, debug=True)
+    app.run(host="localhost", port=5100, debug=True)
+
+
+
 # import google.generativeai as genai
 
 # # Konfigurasikan API key
@@ -18,7 +21,7 @@ if __name__ == "__main__":
 # # Kirim permintaan ke AI
 # try:
 #     # Inisialisasi model
-#     model = genai.GenerativeModel('gemini-pro')
+#     model = genai.GenerativeModel('gemini-2.0-flash')
 
 #     # Menghasilkan konten dengan prompt
 #     response = model.generate_content("Hallo, selamat siang?")
