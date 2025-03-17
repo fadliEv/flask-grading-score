@@ -16,3 +16,9 @@ java_routes.add_url_rule(
     view_func=JavaController.analyze_code,
     methods=["POST"]
 )
+
+java_routes.add_url_rule(
+    "/java/grade-code",
+    view_func=JavaController.grade_code,
+    methods=["POST"]
+)

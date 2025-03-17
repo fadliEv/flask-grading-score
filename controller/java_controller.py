@@ -46,3 +46,23 @@ class JavaController:
             return jsonify({"error": "repository_url harus diberikan"}), 400
         response = ai_service.analyze_code_with_ai(repository_url,branch)
         return jsonify(response), 200
+
+    @staticmethod
+    def grade_code():
+        try:
+            data = request.get_json()
+            if not data:
+                return jsonify({"error": "Request body tidak boleh kosong"}), 400
+            repository_url = data.get("repository_url")
+            branch = data.get("branch", "master")
+            questions = data.get("questions", [])
+            if not repository_url:
+                return jsonify({"error": "repository_url harus diberikan"}), 400
+            if not questions or not isinstance(questions, list):
+                return jsonify({"error": "Pertanyaan harus diberikan dalam bentuk list"}), 400
+            logging.debug(f"📝 Menilai kode dari repository: {repository_url}, branch: {branch}")
+            response = ai_service.grade_code_with_ai(repository_url, branch, questions)
+            return jsonify(response), 200
+        except Exception as e:
+            logging.error(f"❌ Error di grade_code: {str(e)}")
+            return jsonify({"error": f"Error: {str(e)}"}), 500
