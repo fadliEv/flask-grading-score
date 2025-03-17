@@ -67,3 +67,21 @@ class GitLabService:
             return f"Error fetching file content: {e.error_message}"
 
 
+    def get_branches_in_repository(self, repository_url: str):
+        """
+        Mengambil daftar branch yang ada dalam repository GitLab
+        """
+        try:
+            namespace = extract_gitlab_namespace(repository_url)
+            project = self.gl.projects.get(namespace)
+
+            branches = project.branches.list(all=True) 
+            branch_names = [branch.name for branch in branches]
+
+            return {"status": "success", "branches": branch_names}
+
+        except gitlab.exceptions.GitlabGetError as e:
+            return {"status": "error", "error": f"GitLab error: {e.error_message}"}
+
+        except Exception as e:
+            return {"status": "error", "error": f"Unexpected error: {str(e)}"}

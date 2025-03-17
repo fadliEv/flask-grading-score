@@ -76,3 +76,26 @@ class GitLabController:
 
         except Exception as e:
             return jsonify({"error": f"Error: {e}"}), 500
+        
+    @staticmethod
+    def scan_branches():
+        """
+        Endpoint untuk mendapatkan daftar branch dari repository GitLab
+        """
+        try:
+            data = request.get_json()
+            if not data or "repository_url" not in data:
+                return jsonify({"error": "repository_url harus diberikan"}), 400
+
+            repository_url = data["repository_url"]
+
+            # Ambil daftar branch dari GitLab
+            result = gitlab_service.get_branches_in_repository(repository_url)
+
+            if result.get("status") == "error":
+                return jsonify({"status": "error", "error": result["error"]}), 400
+
+            return jsonify({"status": "success", "branches": result["branches"]}), 200
+
+        except Exception as e:
+            return jsonify({"error": f"Error: {str(e)}"}), 500

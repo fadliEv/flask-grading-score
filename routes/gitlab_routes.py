@@ -23,3 +23,10 @@ gitlab_routes.add_url_rule(
     view_func=GitLabController.grade_project,
     methods=["POST"]
 )
+
+
+gitlab_routes.add_url_rule(
+    "/gitlab/scan-branches",
+    view_func=GitLabController.scan_branches,
+    methods=["POST"]
+)
