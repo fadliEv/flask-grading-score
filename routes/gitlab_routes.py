@@ -6,24 +6,9 @@ gitlab_routes = Blueprint("gitlab_routes", __name__)
 
 gitlab_routes.add_url_rule(
     "/gitlab/repository-check",
-    view_func=GitLabController.repository_check,
+    view_func=GitLabController.check_repository_tree,
     methods=["POST"]
 )
-
-# Tambahkan endpoint untuk analisis kode
-gitlab_routes.add_url_rule(
-    "/gitlab/analyze-code",
-    view_func=GitLabController.analyze_code,
-    methods=["GET"]
-)
-
-
-gitlab_routes.add_url_rule(
-    "/grading",
-    view_func=GitLabController.grade_project,
-    methods=["POST"]
-)
-
 
 gitlab_routes.add_url_rule(
     "/gitlab/scan-branches",

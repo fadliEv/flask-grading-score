@@ -2,14 +2,14 @@ import gitlab
 import os
 from dotenv import load_dotenv
 from utils.utils import extract_gitlab_namespace
-import base64
 import logging
+import base64
 
 logging.basicConfig(
-    level=logging.DEBUG,  # Pastikan level debug aktif
+    level=logging.DEBUG,
     format="%(asctime)s - %(levelname)s - %(message)s",
     handlers=[
-        logging.StreamHandler()  # Kirim log ke console
+        logging.StreamHandler()
     ]
 )
 class GitLabService:
@@ -23,48 +23,94 @@ class GitLabService:
 
         self.gl = gitlab.Gitlab(self.gitlab_url, private_token=self.private_token)
 
-    def get_repository_tree_with_content(self, repository_url: str, branch: str, path: str = ""):
+    def get_repository_tree(self, repository_url: str, branch: str):
+        try:            
+            repository = extract_gitlab_namespace(repository_url)                        
+            project = self.gl.projects.get(repository)             
+            items = project.repository_tree(ref=branch)
+            return items
+        
+        except gitlab.exceptions.GitlabGetError as e:
+            return e.error_message
+
+        except Exception as e:            
+            return str(e)
+        
+    def get_java_repository(self, repository_url: str, branch: str):
+        """
+        Mendapatkan seluruh kode Java dari folder src/com/enigmacamp
+        """
         try:
+            # Ambil namespace dan project
             namespace = extract_gitlab_namespace(repository_url)
             project = self.gl.projects.get(namespace)
 
-            # 🔹 Ambil daftar file & folder dengan path tertentu
-            items = project.repository_tree(ref=branch, path=path)
-            result = []
+            # Ambil daftar file & folder di root repository
+            items = project.repository_tree(ref=branch)
 
-            for item in items:
-                if item["type"] == "blob":
-                    # 🔹 Jika file, ambil isi file
-                    content = self.get_file_content(repository_url, item["path"], branch)
-                    result.append({
-                        **item,
-                        "content": content
-                    })
-                else:
-                    # 🔹 Jika folder, tambahkan tanpa mengambil ulang
-                    result.append(item)
+            # Cari folder `src`
+            src_folder = next((item for item in items if item["type"] == "tree" and item["path"] == "src"), None)
+            if not src_folder:
+                return {"error": "Folder 'src' tidak ditemukan di dalam repository."}
 
-            return {"status": "success", "data": result}
+            # Masuk ke dalam `src`
+            src_items = project.repository_tree(path="src", ref=branch)
 
-        except gitlab.exceptions.GitlabGetError as e:
-            return {"status": "error", "error": f"GitLab error: {e.error_message}"}
+            # Cari folder `com` di dalam `src`
+            com_folder = next((item for item in src_items if item["type"] == "tree" and item["path"] == "src/com"), None)
+            if not com_folder:
+                return {"error": "Folder 'com' tidak ditemukan di dalam 'src'."}
 
+            # Masuk ke dalam `src/com`
+            com_items = project.repository_tree(path="src/com", ref=branch)
 
-    def get_file_content(self, project, file_path: str, branch: str):
-        try:
-            # 🔹 Pastikan `project` adalah objek GitLab
-            if not isinstance(project, gitlab.v4.objects.Project):
-                raise ValueError(f"Expected Project object, but got {type(project)}")
+            # Cari folder `enigmacamp` di dalam `src/com`
+            enigmacamp_folder = next((item for item in com_items if item["type"] == "tree" and item["path"].startswith("src/com/enigmacamp")), None)
+            if not enigmacamp_folder:
+                return {"error": "Folder 'enigmacamp' tidak ditemukan di dalam 'src/com'."}
 
-            file = project.files.get(file_path=file_path, ref=branch)
+            # Fungsi Rekursif untuk Mengambil Kode dari Semua File `.java`
+            def extract_code_from_tree(path):
+                """Masuk ke dalam folder dan ambil semua file `.java`"""
+                code_text = ""
+                try:
+                    folder_items = project.repository_tree(path=path, ref=branch)
 
-            # 🔹 Decode base64 content dari GitLab
-            content_bytes = base64.b64decode(file.content)  
-            content_str = content_bytes.decode("utf-8")  
-            
-            return content_str
-        except gitlab.exceptions.GitlabGetError as e:
-            return f"Error fetching file content: {e.error_message}"
+                    for item in folder_items:
+                        # Jika ada subfolder, masuk lagi ke dalamnya (rekursif)
+                        if item["type"] == "tree":
+                            code_text += extract_code_from_tree(item["path"])
+
+                        # Jika file `.java`, ambil isi filenya
+                        elif item["type"] == "blob" and item["path"].endswith(".java"):
+                            try:
+                                file_content = project.files.get(file_path=item["path"], ref=branch)
+
+                                # Decode isi file dari Base64
+                                decoded_content = base64.b64decode(file_content.content).decode("utf-8")
+
+                                code_text += f"\n\nFile: {item['path']}\n{decoded_content}\n"
+                            except gitlab.exceptions.GitlabGetError as e:
+                                print(f"⚠️ Error: Tidak dapat membaca file '{item['path']}' ({e.error_message})")
+
+                except gitlab.exceptions.GitlabGetError as e:
+                    print(f"⚠️ Error: {e.error_message}")
+
+                return code_text
+
+            # Ambil seluruh kode dari folder `src/com/enigmacamp`
+            code_combined = extract_code_from_tree(enigmacamp_folder["path"])
+
+            if not code_combined.strip():
+                return "Tidak ada file .java yang ditemukan dalam 'src/com/enigmacamp'."
+
+            return code_combined
+
+        except gitlab.exceptions.GitlabGetError as e:            
+            return e.error_message
+
+        except Exception as e:
+            return str(e)
 
 
     def get_branches_in_repository(self, repository_url: str):
@@ -78,10 +124,8 @@ class GitLabService:
             branches = project.branches.list(all=True) 
             branch_names = [branch.name for branch in branches]
 
-            return {"status": "success", "branches": branch_names}
-
-        except gitlab.exceptions.GitlabGetError as e:
-            return {"status": "error", "error": f"GitLab error: {e.error_message}"}
-
-        except Exception as e:
-            return {"status": "error", "error": f"Unexpected error: {str(e)}"}
+            return branch_names
+        except gitlab.exceptions.GitlabGetError as e:            
+            return e.error_message
+        except Exception as e:            
+            return str(e)
