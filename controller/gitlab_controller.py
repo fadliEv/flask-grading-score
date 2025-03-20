@@ -40,6 +40,7 @@ class GitLabController:
         except Exception as e:
             logging.error(f"Error di GitLabController: {str(e)}")
             return jsonify(CommonResponseDTO(message=str(e), data={}).dict()), 500            
+        
 
     @staticmethod
     def scan_branches():

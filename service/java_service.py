@@ -2,7 +2,9 @@ import gitlab
 import os
 from dotenv import load_dotenv
 import logging
-from utils.utils import extract_gitlab_namespace
+from service.gitlab_service import GitLabService
+from service.ai_integration_service import AIIntegrationService
+from utils.exception import GitLabRepositoryException
 
 # Konfigurasi logging
 logging.basicConfig(
@@ -16,33 +18,63 @@ class JavaService:
         load_dotenv(override=True)
         self.gitlab_url = os.getenv("GITLAB_URL")
         self.private_token = os.getenv("PRIVATE_TOKEN")
-
         if not self.gitlab_url or not self.private_token:
             raise ValueError("GITLAB_URL dan PRIVATE_TOKEN harus disetel di .env")
+        self.gl = gitlab.Gitlab(self.gitlab_url, private_token=self.private_token)
+        self.gitlab_service = GitLabService() 
+        self.ai_service = AIIntegrationService()
 
-        self.gl = gitlab.Gitlab(self.gitlab_url, private_token=os.getenv("PRIVATE_TOKEN"))
-
-    def get_java_repository_tree(self, repository_url: str, branch: str):
+    def get_java_repository(self, repository_url: str, branch: str):
+        """
+        Mendapatkan seluruh kode Java dari folder src/com/enigmacamp
+        """
         try:
-            logging.debug(f"Request ke repository Java: {repository_url} di branch: {branch}")
+            # Ambil kode Java dari GitLab
+            code_combined = self.gitlab_service.get_java_repository(repository_url, branch)
 
-            repository = extract_gitlab_namespace(repository_url)
-            print(f"Name Space !!!! :  {repository}")   
+            # Jika ada error yang dilemparkan (misalnya, folder tidak ditemukan)
+            if isinstance(code_combined, str) and code_combined.startswith("Tidak ada file .java"):
+                raise GitLabRepositoryException(code_combined)  # Lempar exception jika ada error
 
-            # Ambil repository berdasarkan namespace
-            project = self.gl.projects.get(repository)
-            logging.debug(f"Proyek ditemukan: {project.id}")
+            return code_combined  # Mengembalikan kode yang digabungkan jika tidak ada error
 
-            # Ambil daftar file & folder dari repository
-            items = project.repository_tree(ref=branch)
-            logging.debug(f"Repository tree: {items}")
-
-            return {"status": "success", "data": items}
-        
-        except gitlab.exceptions.GitlabGetError as e:
-            logging.error(f"GitLab error: {e.error_message}")
-            return {"status": "error", "error": f"GitLab error: {e.error_message}"}
-        
+        except GitLabRepositoryException as e:
+            # Menangkap dan menangani error dari GitLabRepositoryException
+            return str(e)  # Mengembalikan pesan error sebagai string
         except Exception as e:
-            logging.error(f"Unexpected error: {e}")
-            return {"status": "error", "error": f"Unexpected error: {str(e)}"}
+            # Menangani error lainnya jika ada
+            return f"Unexpected error occurred: {str(e)}"
+        
+    def analyze_java_code(self, repository_url: str, branch: str):
+        """
+        Mengambil kode Java dari GitLab dan mengirimnya untuk dianalisis dengan AI
+        """
+        # Ambil kode Java dari GitLab
+        code_combined = self.get_java_repository(repository_url, branch)
+
+        # Jika ada error atau tidak ada kode Java ditemukan
+        if isinstance(code_combined, str) and code_combined.startswith("Tidak ada file .java"):
+            return code_combined
+        
+        # Kirim kode yang telah digabungkan ke AI untuk dianalisis
+        analysis_result = self.ai_service.analyze_code_with_ai(code_combined)
+
+        return analysis_result
+        # return "Test"
+
+    def grade(self,repository_url: str, branch: str, questions: list):
+        """
+        Mengambil kode Java dari GitLab dan mengirimnya untuk dianalisis dengan AI
+        """
+        # Ambil kode Java dari GitLab
+        code_combined = self.get_java_repository(repository_url, branch)
+
+        # Jika ada error atau tidak ada kode Java ditemukan
+        if isinstance(code_combined, str) and code_combined.startswith("Tidak ada file .java"):
+            return code_combined
+        
+        # Kirim kode yang telah digabungkan ke AI untuk dianalisis
+        analysis_result = self.ai_service.grade_code_with_ai(code_combined,questions)
+
+        return analysis_result
+        # return "Test"

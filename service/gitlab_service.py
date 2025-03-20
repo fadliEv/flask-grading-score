@@ -2,6 +2,7 @@ import gitlab
 import os
 from dotenv import load_dotenv
 from utils.utils import extract_gitlab_namespace
+from utils.exception import GitLabRepositoryException
 import logging
 import base64
 
@@ -51,23 +52,23 @@ class GitLabService:
             # Cari folder `src`
             src_folder = next((item for item in items if item["type"] == "tree" and item["path"] == "src"), None)
             if not src_folder:
-                return {"error": "Folder 'src' tidak ditemukan di dalam repository."}
+                raise GitLabRepositoryException("Folder 'src' tidak ditemukan di dalam repository.")
 
             # Masuk ke dalam `src`
             src_items = project.repository_tree(path="src", ref=branch)
 
             # Cari folder `com` di dalam `src`
             com_folder = next((item for item in src_items if item["type"] == "tree" and item["path"] == "src/com"), None)
-            if not com_folder:
-                return {"error": "Folder 'com' tidak ditemukan di dalam 'src'."}
+            if not com_folder:                
+                raise GitLabRepositoryException("Folder 'com' tidak ditemukan di dalam 'src'.")
 
             # Masuk ke dalam `src/com`
             com_items = project.repository_tree(path="src/com", ref=branch)
 
             # Cari folder `enigmacamp` di dalam `src/com`
             enigmacamp_folder = next((item for item in com_items if item["type"] == "tree" and item["path"].startswith("src/com/enigmacamp")), None)
-            if not enigmacamp_folder:
-                return {"error": "Folder 'enigmacamp' tidak ditemukan di dalam 'src/com'."}
+            if not enigmacamp_folder:                
+                raise GitLabRepositoryException("Folder 'enigmacamp' tidak ditemukan di dalam 'src/com'.")
 
             # Fungsi Rekursif untuk Mengambil Kode dari Semua File `.java`
             def extract_code_from_tree(path):
@@ -91,10 +92,10 @@ class GitLabService:
 
                                 code_text += f"\n\nFile: {item['path']}\n{decoded_content}\n"
                             except gitlab.exceptions.GitlabGetError as e:
-                                print(f"⚠️ Error: Tidak dapat membaca file '{item['path']}' ({e.error_message})")
+                                return e.error_message
 
                 except gitlab.exceptions.GitlabGetError as e:
-                    print(f"⚠️ Error: {e.error_message}")
+                    return e.error_message
 
                 return code_text
 
@@ -102,15 +103,16 @@ class GitLabService:
             code_combined = extract_code_from_tree(enigmacamp_folder["path"])
 
             if not code_combined.strip():
-                return "Tidak ada file .java yang ditemukan dalam 'src/com/enigmacamp'."
+                raise GitLabRepositoryException("Tidak ada file .java yang ditemukan dalam 'src/com/enigmacamp'.")
 
             return code_combined
 
-        except gitlab.exceptions.GitlabGetError as e:            
-            return e.error_message
-
+        except gitlab.exceptions.GitlabGetError as e:                      
+            print(f"Gitlab Error : {e.error_message}")  
+            raise GitLabRepositoryException(f"GitLab Error: {e.error_message}")
         except Exception as e:
-            return str(e)
+            print(str(e))  
+            raise GitLabRepositoryException(f"Unexpected Error: {str(e)}")
 
 
     def get_branches_in_repository(self, repository_url: str):

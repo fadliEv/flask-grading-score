@@ -7,7 +7,7 @@ java_routes = Blueprint("java_routes", __name__)
 # Endpoint untuk cek repository Java
 java_routes.add_url_rule(
     "/java/repository-check",
-    view_func=JavaController.check_java_repository,
+    view_func=JavaController.get_java_code,
     methods=["POST"]
 )
 
