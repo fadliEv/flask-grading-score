@@ -67,7 +67,7 @@ class JavaService:
         Mengambil kode Java dari GitLab dan mengirimnya untuk dianalisis dengan AI
         """
         # Ambil kode Java dari GitLab
-        code_combined = self.get_java_repository(repository_url, branch)
+        code_combined = self.gitlab_service.get_java_repository_from_src(repository_url, branch)
 
         # Jika ada error atau tidak ada kode Java ditemukan
         if isinstance(code_combined, str) and code_combined.startswith("Tidak ada file .java"):

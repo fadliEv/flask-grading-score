@@ -15,3 +15,16 @@ gitlab_routes.add_url_rule(
     view_func=GitLabController.scan_branches,
     methods=["POST"]
 )
+
+gitlab_routes.add_url_rule(
+    "/gitlab/repository-java-main-check",
+    view_func=GitLabController.get_java_repo_base_main,
+    methods=["POST"]
+)
+
+
+gitlab_routes.add_url_rule(
+    "/gitlab/repository-java-src-check",
+    view_func=GitLabController.get_java_repo_base_src_path,
+    methods=["POST"]
+)

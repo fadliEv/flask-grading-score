@@ -66,3 +66,55 @@ class GitLabController:
 
         except Exception as e:
             return jsonify(CommonResponseDTO(message="Error occurred while fetching branches", data={"error": str(e)}).dict()), 500
+        
+    @staticmethod
+    def get_java_repo_base_main():
+        """
+        Endpoint untuk mendapatkan daftar branch dari repository GitLab
+        """
+        try:
+            data = request.get_json()
+            if not data:
+                return jsonify(CommonResponseDTO(message="Request body tidak boleh kosong", data={}).dict()), 400
+
+            repository_url = data.get("repository_url")
+            branch = data.get("branch", "master")
+
+            if not repository_url:
+                return jsonify(CommonResponseDTO(message="repository_url is required", data={}).dict()), 400
+            
+            result = gitlab_service.get_java_repository_from_main(repository_url,branch)
+            
+            if isinstance(result, str):
+                return jsonify(CommonResponseDTO(message="Success get code java", data=result).dict()), 200            
+
+            return jsonify(CommonResponseDTO(message="Unexpected result format", data={}).dict()), 500
+
+        except Exception as e:
+            return jsonify(CommonResponseDTO(message="Error occurred while fetching branches", data={"error": str(e)}).dict()), 500
+        
+    @staticmethod
+    def get_java_repo_base_src_path():
+        """
+        Endpoint untuk mendapatkan daftar branch dari repository GitLab
+        """
+        try:
+            data = request.get_json()
+            if not data:
+                return jsonify(CommonResponseDTO(message="Request body tidak boleh kosong", data={}).dict()), 400
+
+            repository_url = data.get("repository_url")
+            branch = data.get("branch", "master")
+
+            if not repository_url:
+                return jsonify(CommonResponseDTO(message="repository_url is required", data={}).dict()), 400
+            
+            result = gitlab_service.get_java_repository_from_src(repository_url,branch)
+            
+            if isinstance(result, str):
+                return jsonify(CommonResponseDTO(message="Success get code java", data=result).dict()), 200            
+
+            return jsonify(CommonResponseDTO(message="Unexpected result format", data={}).dict()), 500
+
+        except Exception as e:
+            return jsonify(CommonResponseDTO(message="Error occurred while fetching branches", data={"error": str(e)}).dict()), 500

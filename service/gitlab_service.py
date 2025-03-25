@@ -131,3 +131,138 @@ class GitLabService:
             return e.error_message
         except Exception as e:            
             return str(e)
+        
+    def get_java_repository_from_main(self, repository_url: str, branch: str):
+        """
+        Mendapatkan seluruh kode Java yang berada di dalam folder yang sama dengan Main.java,
+        tanpa bergantung pada prefix folder dan menelusuri subfolder ke tingkat lebih dalam.
+        """
+        try:
+            # Ambil namespace dan project
+            namespace = extract_gitlab_namespace(repository_url)
+            project = self.gl.projects.get(namespace)
+
+            # Fungsi rekursif untuk mencari file Main.java
+            def find_main_file(path=""):
+                """Mencari file Main.java dalam seluruh struktur repository"""
+                folder_items = project.repository_tree(path=path, ref=branch)
+                
+                for item in folder_items:
+                    # Jika item adalah folder, telusuri lagi secara rekursif
+                    if item["type"] == "tree":
+                        found_file = find_main_file(item["path"])  # Cari dalam subfolder
+                        if found_file:  # Jika ditemukan, kembalikan path file Main.java
+                            return found_file
+                    elif item["type"] == "blob" and item["path"].endswith("Main.java"):
+                        return item["path"]  # Temukan Main.java, kembalikan pathnya
+                
+                return None  # Jika tidak ditemukan
+
+            # Cari file Main.java di seluruh repository
+            main_file_path = find_main_file()
+
+            # Jika Main.java tidak ditemukan, lempar exception
+            if not main_file_path:
+                raise GitLabRepositoryException("File 'Main.java' tidak ditemukan di dalam repository.")
+
+            # Fungsi untuk menelusuri dan mengambil semua file `.java` dari folder yang sama dengan Main.java
+            def extract_code_from_tree(path):
+                """Masuk ke dalam folder dan ambil semua file `.java` yang ada di dalam folder ini dan subfoldernya"""
+                code_text = ""
+                try:
+                    folder_items = project.repository_tree(path=path, ref=branch)
+
+                    for item in folder_items:
+                        # Jika ada subfolder, masuk lagi ke dalamnya (rekursif)
+                        if item["type"] == "tree":
+                            code_text += extract_code_from_tree(item["path"])
+
+                        # Jika file `.java`, ambil isi filenya
+                        elif item["type"] == "blob" and item["path"].endswith(".java"):
+                            try:
+                                file_content = project.files.get(file_path=item["path"], ref=branch)
+
+                                # Decode isi file dari Base64
+                                decoded_content = base64.b64decode(file_content.content).decode("utf-8")
+
+                                code_text += f"\n\nFile: {item['path']}\n{decoded_content}\n"
+                            except gitlab.exceptions.GitlabGetError as e:
+                                return e.error_message
+
+                except gitlab.exceptions.GitlabGetError as e:
+                    return e.error_message
+
+                return code_text
+
+            # Ambil folder tempat Main.java berada
+            main_file_folder = "/".join(main_file_path.split("/")[:-1])  # Mengambil path tanpa nama file
+
+            # Ambil seluruh kode dari folder yang sama dengan Main.java
+            code_combined = extract_code_from_tree(main_file_folder)
+
+            if not code_combined.strip():
+                raise GitLabRepositoryException("Tidak ada file .java yang ditemukan dalam folder yang sama dengan 'Main.java'.")
+            print(f"TEST!!! : {code_combined}")
+            return code_combined
+
+        except gitlab.exceptions.GitlabGetError as e:
+            print(f"Gitlab Error : {e.error_message}")
+            raise GitLabRepositoryException(f"GitLab Error: {e.error_message}")
+        except Exception as e:
+            print(str(e))
+            raise GitLabRepositoryException(f"Unexpected Error: {str(e)}")
+
+    def get_java_repository_from_src(self, repository_url: str, branch: str):
+        """
+        Mendapatkan seluruh kode Java yang ada di dalam folder /src dan semua subfoldernya.
+        Semua file .java yang ditemukan akan digabungkan.
+        """
+        try:
+            # Ambil namespace dan project
+            namespace = extract_gitlab_namespace(repository_url)
+            project = self.gl.projects.get(namespace)
+
+            # Fungsi untuk menelusuri dan mengambil semua file `.java` dalam folder /src dan subfoldernya
+            def extract_code_from_tree(path="src"):
+                """Masuk ke dalam folder src dan ambil semua file `.java` yang ada di dalam folder ini dan subfoldernya"""
+                code_text = ""
+                try:
+                    folder_items = project.repository_tree(path=path, ref=branch)
+
+                    for item in folder_items:
+                        # Jika ada subfolder, masuk lagi ke dalamnya (rekursif)
+                        if item["type"] == "tree":
+                            code_text += extract_code_from_tree(item["path"])
+
+                        # Jika file `.java`, ambil isi filenya
+                        elif item["type"] == "blob" and item["path"].endswith(".java"):
+                            try:
+                                file_content = project.files.get(file_path=item["path"], ref=branch)
+
+                                # Decode isi file dari Base64
+                                decoded_content = base64.b64decode(file_content.content).decode("utf-8")
+
+                                code_text += f"\n\nFile: {item['path']}\n{decoded_content}\n"
+                            except gitlab.exceptions.GitlabGetError as e:
+                                return e.error_message
+
+                except gitlab.exceptions.GitlabGetError as e:
+                    return e.error_message
+
+                return code_text
+
+            # Ambil seluruh kode dari folder src dan subfoldernya
+            code_combined = extract_code_from_tree("src")
+
+            if not code_combined.strip():
+                raise GitLabRepositoryException("Tidak ada file .java yang ditemukan dalam folder /src atau subfoldernya.")
+
+            return code_combined
+
+        except gitlab.exceptions.GitlabGetError as e:
+            print(f"Gitlab Error : {e.error_message}")
+            raise GitLabRepositoryException(f"GitLab Error: {e.error_message}")
+        except Exception as e:
+            print(str(e))
+            raise GitLabRepositoryException(f"Unexpected Error: {str(e)}")
+
